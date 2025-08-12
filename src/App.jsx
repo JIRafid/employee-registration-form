@@ -22,32 +22,32 @@ function App() {
       !value
         ? "First name is required"
         : !/^[a-zA-Z]+(?:[ -'][a-zA-Z]+)*$/.test(value)
-        ? "Please enter a valid first name"
+        ? "Invalid first name"
         : "",
     lName: (value) =>
       !value
         ? "Last name is required"
         : !/^[a-zA-Z]+(?:[ -'][a-zA-Z]+)*$/.test(value)
-        ? "Please enter a valid last name"
+        ? "Invalid last name"
         : "",
     email: (value) =>
       !value
         ? "Email is required"
         : !/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(value)
-        ? "Please enter a valid email address"
+        ? "Invalid email address"
         : "",
     number: (value) =>
       !value
         ? "Phone number is required"
         : !/^\+?(88)?0(19|14|17|13|18|16|15)\d{8}$/.test(value)
-        ? "Please enter a valid phone number"
+        ? "Invalid phone number"
         : "",
     dob: (value) => {
       if (!value) return "Date of birth is required";
       const currentDate = new Date();
       const dob = new Date(value);
       const age = currentDate.getFullYear() - dob.getFullYear();
-      return age < 18 ? "You must be at least 18 years old" : "";
+      return age < 18 ? "Underage" : "";
     },
     department: (value) => (!value ? "Department is required" : ""),
     address: (value) =>
@@ -56,7 +56,7 @@ function App() {
         : value.length > 100
         ? "Address is too long"
         : !/^[a-zA-Z0-9\s,\-.]*$/.test(value)
-        ? "Address contains invalid characters"
+        ? "Invalid Address"
         : "",
     img: (value) => (!value ? "Profile image is required" : ""),
     resume: (value) => (!value ? "Resume is required" : ""),
@@ -85,12 +85,29 @@ function App() {
     }));
   };
 
-  const handleFileChange = (property, files) => {
-    if (!files || !files[0]) {
+  const allowedImageTypes = ["image/jpeg", "image/png", "image/gif"];
+  const allowedResumeTypes = [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ];
+
+  const validateAndReadFile = (property, file) => {
+    if (
+      (property === "img" && !allowedImageTypes.includes(file.type)) ||
+      (property === "resume" && !allowedResumeTypes.includes(file.type))
+    ) {
+      setErrors((prev) => ({
+        ...prev,
+        [property]:
+          property === "img"
+            ? "Invalid image type. Allowed: jpg, png, gif."
+            : "Invalid resume type. Allowed: pdf, doc, docx.",
+      }));
       inputOnChange(property, "");
       return;
     }
-    const file = files[0];
+
     if (
       (property === "img" && file.size > 2 * 1024 * 1024) ||
       (property === "resume" && file.size > 5 * 1024 * 1024)
@@ -105,7 +122,46 @@ function App() {
       inputOnChange(property, "");
       return;
     }
-    inputOnChange(property, file.name);
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      const base64String = reader.result;
+      inputOnChange(property, base64String);
+    };
+    reader.onerror = () => {
+      inputOnChange(property, "");
+    };
+  };
+
+  const handleFileChange = (property, event) => {
+    const file = event.target.files[0];
+    if (!file) {
+      inputOnChange(property, "");
+      return;
+    }
+    validateAndReadFile(property, file);
+  };
+
+  const handleFileDrop = (property, event) => {
+    event.preventDefault();
+    const file = event.dataTransfer.files[0];
+    if (!file) {
+      inputOnChange(property, "");
+      return;
+    }
+    validateAndReadFile(property, file);
+  };
+
+  const removeFiles = (property) => {
+    setFormData((prev) => ({
+      ...prev,
+      [property]: "",
+    }));
+    setErrors((prev) => ({
+      ...prev,
+      [property]: validators[property](""),
+    }));
   };
 
   const resetForm = () => {
@@ -121,7 +177,6 @@ function App() {
       if (error) newErrors[key] = error;
     });
     setErrors(newErrors);
-
     if (Object.keys(newErrors).length === 0) {
       console.log(formData);
       alert("Form submitted successfully!");
@@ -155,7 +210,6 @@ function App() {
                 errors.fName ? "border-red-500" : ""
               }`}
               placeholder="Enter first name"
-              required
             />
             {errors.fName && (
               <span className="text-red-500 text-sm">{errors.fName}</span>
@@ -172,7 +226,6 @@ function App() {
                 errors.email ? "border-red-500" : ""
               }`}
               placeholder="Enter email"
-              required
             />
             {errors.email && (
               <span className="text-red-500 text-sm">{errors.email}</span>
@@ -188,7 +241,6 @@ function App() {
               className={`mt-1 block w-full border rounded-md p-2 ${
                 errors.dob ? "border-red-500" : ""
               }`}
-              required
             />
             {errors.dob && (
               <span className="text-red-500 text-sm">{errors.dob}</span>
@@ -207,7 +259,6 @@ function App() {
                 errors.lName ? "border-red-500" : ""
               }`}
               placeholder="Enter last name"
-              required
             />
             {errors.lName && (
               <span className="text-red-500 text-sm">{errors.lName}</span>
@@ -224,8 +275,6 @@ function App() {
                 errors.number ? "border-red-500" : ""
               }`}
               placeholder="+8801234567890"
-              pattern="^\+?(88)?0(19|14|17|13|18|16|15)\d{8}$"
-              required
             />
             {errors.number && (
               <span className="text-red-500 text-sm">{errors.number}</span>
@@ -240,7 +289,6 @@ function App() {
               className={`mt-1 block w-full border rounded-md p-2 ${
                 errors.department ? "border-red-500" : ""
               }`}
-              required
             >
               <option value="">Select Department</option>
               <option value="IT">IT</option>
@@ -265,59 +313,98 @@ function App() {
               errors.address ? "border-red-500" : ""
             }`}
             placeholder="Enter your address"
-            required
           />
           {errors.address && (
             <span className="text-red-500 text-sm">{errors.address}</span>
           )}
         </div>
+
+        {/* Profile Image Dropzone */}
         <div className="mt-6">
           <h2 className="text-blue-800 text-lg font-semibold mb-2">
             Profile Image <span style={{ color: "red" }}>*</span>
           </h2>
           <hr />
-          <div className="border-2 border-dashed border-gray-300 rounded-md p-12 text-center mt-5">
+          <div
+            className={`border-2 border-dashed rounded-md p-12 text-center mt-5 ${
+              errors.img ? "border-red-500 border" : "border-gray-300"
+            }`}
+            onDrop={(e) => handleFileDrop("img", e)}
+            onDragOver={(e) => e.preventDefault()}
+          >
             <input
               type="file"
               accept="image/jpeg,image/png,image/gif"
               className={`mt-1 block w-full text-sm text-gray-600 ${
                 errors.img ? "border border-red-500 rounded" : ""
               }`}
-              onChange={(e) => handleFileChange("img", e.target.files)}
+              onChange={(e) => handleFileChange("img", e)}
             />
             {errors.img && (
               <span className="text-red-500 text-sm">{errors.img}</span>
             )}
-            <p className="mt-1 text-xs text-gray-500">
-              <span className="text-4xl">📷</span> <br />
-              Drag & drop profile image here <br /> or{" "}
-              <span className="font-bold">browse files</span> <br />
-              JPG, PNG or GIF (max. 2MB)
-            </p>
+            {formData.img && (
+              <div className="mt-2">
+                <img
+                  className="h-[200px] w-[200px] border rounded-lg mx-auto"
+                  src={formData.img}
+                  alt="Preview"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeFiles("img")}
+                  className="ml-2 text-red-500"
+                >
+                  ❌
+                </button>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Resume Dropzone */}
         <div className="mt-6">
           <h2 className="text-blue-800 text-lg font-semibold mb-2">
             Resume <span style={{ color: "red" }}>*</span>
           </h2>
           <hr />
-          <div className="border-2 border-dashed border-gray-300 rounded-md p-12 text-center mt-5">
+          <div
+            className={`border-2 border-dashed rounded-md p-12 text-center mt-5 ${
+              errors.resume ? "border-red-500 border" : "border-gray-300"
+            }`}
+            onDrop={(e) => handleFileDrop("resume", e)}
+            onDragOver={(e) => e.preventDefault()}
+          >
             <input
               type="file"
               accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               className={`mt-1 block w-full text-sm text-gray-600 ${
                 errors.resume ? "border border-red-500 rounded" : ""
               }`}
-              onChange={(e) => handleFileChange("resume", e.target.files)}
+              onChange={(e) => handleFileChange("resume", e)}
             />
             {errors.resume && (
               <span className="text-red-500 text-sm">{errors.resume}</span>
             )}
-            <p className="mt-1 text-xs text-gray-500">
-              PDF, DOC or DOCX (max. 5MB)
-            </p>
+            {formData.resume && (
+              <div className="mt-2">
+                <iframe
+                  className="h-[200px] w-[200px] border rounded-lg mx-auto"
+                  src={formData.resume}
+                  title="Resume Preview"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeFiles("resume")}
+                  className="ml-2 text-red-500"
+                >
+                  ❌
+                </button>
+              </div>
+            )}
           </div>
         </div>
+
         <div className="flex justify-center gap-3 mt-6">
           <button
             type="button"
